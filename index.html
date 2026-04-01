@@ -10,40 +10,56 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
     <style>
-        /* ─── TOKENS ─────────────────────────────────────────────── */
         :root {
             --verde:    #009639;
             --verde-dk: #007a2e;
             --verde-lt: #e6f5ec;
             --vermelho: #C8102E;
             --preto:    #0d0d0d;
-            --cinza-1:  #f7f7f5;
-            --cinza-2:  #ebebeb;
+            --cinza-1:  #f0f0ee;
+            --cinza-2:  #e2e2e2;
             --cinza-3:  #aaaaaa;
             --branco:   #ffffff;
             --txt:      #1a1a1a;
             --txt-sec:  #666666;
             --radius:   16px;
-            --shadow:   0 4px 24px rgba(0,0,0,.07);
-            --shadow-h: 0 12px 40px rgba(0,0,0,.14);
+            --shadow:   0 4px 24px rgba(0,0,0,.08);
+            --shadow-h: 0 12px 40px rgba(0,0,0,.16);
             --dur:      .35s;
         }
-
-        /* ─── RESET & BASE ───────────────────────────────────────── */
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        /* ── FUNDO ANTI-BURN-IN ────────────────────────────────────
+           Canvas com bolhas de gradiente se movendo lentamente.
+           Velocidade imperceptível ao olho, mas mantém os pixels
+           em constante mudança — protege telas OLED/plasma/LCD.
+        ─────────────────────────────────────────────────────────── */
+        #bg-canvas {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+        }
 
         body {
             font-family: 'DM Sans', sans-serif;
-            background: var(--cinza-1);
             color: var(--txt);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            background: #eef0ee;
         }
 
-        /* ─── HEADER ─────────────────────────────────────────────── */
+        header, .top-bar, #status-console, .main-content, footer {
+            position: relative;
+            z-index: 10;
+        }
+
+        /* ── HEADER ────────────────────────────────────────────── */
         header {
-            background: var(--branco);
+            background: rgba(255,255,255,.92);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
             border-bottom: 5px solid var(--verde);
             box-shadow: 0 2px 20px rgba(0,0,0,.06);
             padding: 0 32px;
@@ -56,466 +72,340 @@
             top: 0;
             z-index: 200;
         }
-
-        .logo-if {
-            height: 60px;
-            width: auto;
-            display: block;
-        }
-
+        .logo-if { height: 60px; width: auto; display: block; }
         .header-brand h1 {
             font-family: 'Syne', sans-serif;
-            font-size: 1.25rem;
-            font-weight: 800;
-            color: var(--preto);
-            letter-spacing: -.5px;
-            line-height: 1.1;
+            font-size: 1.25rem; font-weight: 800;
+            color: var(--preto); letter-spacing: -.5px; line-height: 1.1;
         }
         .header-brand span {
             display: block;
             font-family: 'DM Sans', sans-serif;
-            font-size: .75rem;
-            font-weight: 500;
-            color: var(--verde);
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            margin-bottom: 3px;
+            font-size: .75rem; font-weight: 500;
+            color: var(--verde); letter-spacing: 2px;
+            text-transform: uppercase; margin-bottom: 3px;
         }
-
-        .header-clock {
-            text-align: right;
-        }
+        .header-clock { text-align: right; }
         #clock {
             font-family: 'Syne', sans-serif;
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--preto);
-            line-height: 1;
-            letter-spacing: -1px;
+            font-size: 2rem; font-weight: 700;
+            color: var(--preto); line-height: 1; letter-spacing: -1px;
         }
         #date-top {
-            font-size: .72rem;
-            font-weight: 700;
-            color: var(--verde);
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            margin-top: 2px;
+            font-size: .72rem; font-weight: 700;
+            color: var(--verde); text-transform: uppercase;
+            letter-spacing: 1.5px; margin-top: 2px;
         }
 
-        /* ─── PROGRESS & CONSOLE ─────────────────────────────────── */
-        .top-bar {
-            height: 3px;
-            background: var(--cinza-2);
-            position: relative;
-            overflow: hidden;
-        }
-        #bar-fill {
-            height: 100%;
-            background: var(--verde);
-            transition: width 1s linear;
-            position: relative;
-        }
-        #bar-fill::after {
-            content: '';
-            position: absolute;
-            right: 0; top: 0; bottom: 0;
-            width: 60px;
-            background: linear-gradient(to right, transparent, rgba(255,255,255,.6));
-        }
+        /* ── BARRA DE PROGRESSO ────────────────────────────────── */
+        .top-bar { height: 3px; background: var(--cinza-2); overflow: hidden; }
+        #bar-fill { height: 100%; background: var(--verde); transition: width 1s linear; }
 
+        /* ── CONSOLE ───────────────────────────────────────────── */
         #status-console {
             font-family: 'DM Sans', monospace;
-            font-size: .78rem;
-            color: var(--verde);
-            background: #0d1a12;
-            padding: 8px 16px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            font-size: .78rem; color: var(--verde);
+            background: rgba(13,26,18,.9);
+            backdrop-filter: blur(8px);
+            padding: 7px 16px;
+            display: flex; align-items: center; gap: 8px;
         }
         #status-console::before {
-            content: '●';
-            font-size: .6rem;
+            content: '●'; font-size: .6rem;
             animation: blink 1.4s ease infinite;
         }
-        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.15} }
 
-        /* ─── LAYOUT ─────────────────────────────────────────────── */
+        /* ── LAYOUT ────────────────────────────────────────────── */
         .main-content {
             padding: 24px 20px 110px;
-            flex: 1;
-            max-width: 1600px;
-            margin: 0 auto;
-            width: 100%;
+            flex: 1; max-width: 1600px; margin: 0 auto; width: 100%;
         }
 
-        /* ─── FILTROS ────────────────────────────────────────────── */
+        /* ── FILTROS ───────────────────────────────────────────── */
         .filters-wrap {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-bottom: 24px;
-            align-items: center;
+            display: flex; flex-wrap: wrap;
+            gap: 6px; margin-bottom: 24px; align-items: center;
         }
         .filters-label {
-            font-size: .72rem;
-            font-weight: 700;
-            letter-spacing: 1.5px;
-            text-transform: uppercase;
-            color: var(--cinza-3);
-            margin-right: 4px;
+            font-size: .72rem; font-weight: 700;
+            letter-spacing: 1.5px; text-transform: uppercase;
+            color: var(--cinza-3); margin-right: 4px;
         }
         .btn-filter {
-            background: var(--branco);
+            background: rgba(255,255,255,.85);
             border: 1.5px solid var(--cinza-2);
             color: var(--txt-sec);
-            padding: 6px 14px;
-            border-radius: 999px;
-            cursor: pointer;
-            font-size: .8rem;
-            font-weight: 700;
+            padding: 6px 14px; border-radius: 999px;
+            cursor: pointer; font-size: .8rem; font-weight: 700;
             font-family: 'DM Sans', sans-serif;
             transition: background var(--dur), color var(--dur), border-color var(--dur), transform .15s;
-            white-space: nowrap;
+            white-space: nowrap; backdrop-filter: blur(6px);
         }
-        .btn-filter:hover { border-color: var(--verde); color: var(--verde); transform: translateY(-1px); }
+        .btn-filter:hover  { border-color: var(--verde); color: var(--verde); transform: translateY(-1px); }
         .btn-filter.active { background: var(--verde); color: var(--branco); border-color: var(--verde); }
 
-        /* ─── SKELETON ───────────────────────────────────────────── */
+        /* ── SKELETON ──────────────────────────────────────────── */
         .skeleton-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(340px,1fr));
             gap: 18px;
         }
         .skeleton-card {
-            background: var(--branco);
-            border-radius: var(--radius);
-            height: 180px;
-            overflow: hidden;
-            position: relative;
+            background: rgba(255,255,255,.5);
+            border-radius: var(--radius); height: 180px;
+            overflow: hidden; position: relative;
         }
         .skeleton-card::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.7) 50%, transparent 100%);
-            background-size: 200% 100%;
-            animation: shimmer 1.4s infinite;
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(90deg,transparent 0%,rgba(255,255,255,.6) 50%,transparent 100%);
+            background-size: 200% 100%; animation: shimmer 1.4s infinite;
         }
         @keyframes shimmer { from{background-position:200% 0} to{background-position:-200% 0} }
 
-        /* ─── NEWS GRID ──────────────────────────────────────────── */
+        /* ── NEWS GRID ─────────────────────────────────────────── */
         #news-container {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
             gap: 18px;
         }
 
-        /* ─── CARD ───────────────────────────────────────────────── */
+        /* ── CARD ──────────────────────────────────────────────── */
         .card {
-            display: flex;
-            flex-direction: column;
-            background: var(--branco);
-            border-radius: var(--radius);
-            overflow: hidden;
-            text-decoration: none;
-            color: inherit;
+            display: flex; flex-direction: column;
+            background: rgba(255,255,255,.93);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            border-radius: var(--radius); overflow: hidden;
+            text-decoration: none; color: inherit;
             box-shadow: var(--shadow);
             transition: box-shadow var(--dur), transform var(--dur);
             position: relative;
-            animation: fadeUp .4s ease both;
+            animation: fadeUp .5s ease both;
         }
         @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(18px); }
-            to   { opacity: 1; transform: translateY(0); }
+            from { opacity:0; transform:translateY(20px); }
+            to   { opacity:1; transform:translateY(0); }
         }
-        .card:hover {
-            box-shadow: var(--shadow-h);
-            transform: translateY(-4px);
-        }
+        .card:hover { box-shadow: var(--shadow-h); transform: translateY(-4px); }
 
-        /* stagger delay para cada card */
-        .card:nth-child(1)  { animation-delay: .04s }
-        .card:nth-child(2)  { animation-delay: .08s }
-        .card:nth-child(3)  { animation-delay: .12s }
-        .card:nth-child(4)  { animation-delay: .16s }
-        .card:nth-child(5)  { animation-delay: .20s }
-        .card:nth-child(6)  { animation-delay: .24s }
-        .card:nth-child(7)  { animation-delay: .28s }
-        .card:nth-child(8)  { animation-delay: .32s }
-        .card:nth-child(9)  { animation-delay: .36s }
-        .card:nth-child(10) { animation-delay: .40s }
-        .card:nth-child(n+11) { animation-delay: .44s }
+        .card:nth-child(1){animation-delay:.04s}.card:nth-child(2){animation-delay:.08s}
+        .card:nth-child(3){animation-delay:.12s}.card:nth-child(4){animation-delay:.16s}
+        .card:nth-child(5){animation-delay:.20s}.card:nth-child(6){animation-delay:.24s}
+        .card:nth-child(7){animation-delay:.28s}.card:nth-child(8){animation-delay:.32s}
+        .card:nth-child(n+9){animation-delay:.36s}
 
-        /* card destaque ocupa 2 colunas */
         .card.featured {
-            grid-column: 1 / -1;
-            flex-direction: row;
-            max-height: 280px;
+            grid-column: 1 / -1; flex-direction: row; max-height: 280px;
         }
-
-        /* faixa verde lateral no destaque */
         .card.featured::before {
-            content: '';
-            position: absolute;
-            left: 0; top: 0; bottom: 0;
-            width: 5px;
-            background: var(--verde);
+            content: ''; position: absolute;
+            left:0; top:0; bottom:0; width:5px; background: var(--verde);
         }
 
-        /* ─── IMAGEM ─────────────────────────────────────────────── */
+        /* ── IMAGEM COM KEN BURNS ──────────────────────────────────
+           Animação de pan + zoom lento em loop (28–34s por ciclo).
+           Mantém a imagem em movimento constante sem parecer um
+           slideshow — protege contra burn-in e enriquece o visual.
+        ─────────────────────────────────────────────────────────── */
         .img-box {
-            position: relative;
-            background: var(--cinza-2);
-            overflow: hidden;
-            flex-shrink: 0;
+            position: relative; background: var(--cinza-2);
+            overflow: hidden; flex-shrink: 0;
         }
-        .card:not(.featured) .img-box {
-            height: 170px;
-        }
-        .card.featured .img-box {
-            width: 38%;
-            height: 100%;
-        }
+        .card:not(.featured) .img-box { height: 170px; }
+        .card.featured .img-box { width: 38%; height: 100%; }
 
         .img-src {
-            width: 100%;
-            height: 100%;
-            background-size: cover;
+            width: 100%; height: 100%;
+            background-size: 115%;
             background-position: center;
-            transition: transform .6s ease;
         }
-        .card:hover .img-src { transform: scale(1.04); }
-
         .img-src.fallback {
             background-size: 55%;
             background-repeat: no-repeat;
-            background-position: center;
+            animation: none !important;
         }
 
-        /* ─── BADGE CAMPUS ───────────────────────────────────────── */
+        @keyframes kb-tl {
+            0%  { transform: scale(1.12) translate(-3%,-3%); }
+            50% { transform: scale(1.00) translate( 2%, 2%); }
+            100%{ transform: scale(1.12) translate(-3%,-3%); }
+        }
+        @keyframes kb-tr {
+            0%  { transform: scale(1.10) translate( 3%,-3%); }
+            50% { transform: scale(1.00) translate(-2%, 2%); }
+            100%{ transform: scale(1.10) translate( 3%,-3%); }
+        }
+        @keyframes kb-br {
+            0%  { transform: scale(1.12) translate( 3%, 3%); }
+            50% { transform: scale(1.00) translate(-2%,-2%); }
+            100%{ transform: scale(1.12) translate( 3%, 3%); }
+        }
+        @keyframes kb-bl {
+            0%  { transform: scale(1.10) translate(-3%, 3%); }
+            50% { transform: scale(1.00) translate( 2%,-2%); }
+            100%{ transform: scale(1.10) translate(-3%, 3%); }
+        }
+
+        .kb-0 { animation: kb-tl 30s ease-in-out infinite; }
+        .kb-1 { animation: kb-tr 34s ease-in-out infinite; }
+        .kb-2 { animation: kb-br 28s ease-in-out infinite; }
+        .kb-3 { animation: kb-bl 32s ease-in-out infinite; }
+
+        /* ── BADGE ─────────────────────────────────────────────── */
         .badge {
-            position: absolute;
-            bottom: 10px; left: 10px;
-            background: var(--verde);
-            color: var(--branco);
-            font-size: .65rem;
-            font-weight: 700;
-            padding: 4px 10px;
-            border-radius: 999px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            z-index: 2;
-            backdrop-filter: blur(4px);
-        }
-        .card.featured .badge {
-            font-size: .7rem;
-            padding: 5px 12px;
+            position: absolute; bottom:10px; left:10px;
+            background: var(--verde); color: var(--branco);
+            font-size: .65rem; font-weight: 700;
+            padding: 4px 10px; border-radius: 999px;
+            text-transform: uppercase; letter-spacing: 1px; z-index: 2;
         }
 
-        /* ─── INFO ───────────────────────────────────────────────── */
+        /* ── INFO ──────────────────────────────────────────────── */
         .info {
             padding: 18px 20px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            gap: 10px;
-            flex: 1;
-            overflow: hidden;
-        }
-
-        .card-meta {
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            display: flex; flex-direction: column;
+            justify-content: center; gap: 10px;
+            flex: 1; overflow: hidden;
         }
         .card-meta time {
-            font-size: .72rem;
-            font-weight: 700;
-            color: var(--txt-sec);
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            font-size: .72rem; font-weight: 700;
+            color: var(--txt-sec); text-transform: uppercase; letter-spacing: 1px;
         }
-        .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--cinza-3); }
-
         .title {
             font-family: 'Syne', sans-serif;
-            font-size: 1rem;
-            font-weight: 700;
-            line-height: 1.3;
-            color: var(--preto);
-            display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
+            font-size: 1rem; font-weight: 700;
+            line-height: 1.3; color: var(--preto);
+            display: -webkit-box; -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical; overflow: hidden;
         }
-        .card.featured .title {
-            font-size: 1.35rem;
-            -webkit-line-clamp: 4;
-        }
-
+        .card.featured .title { font-size: 1.35rem; -webkit-line-clamp: 4; }
         .card-link-hint {
-            font-size: .72rem;
-            font-weight: 700;
-            color: var(--verde);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            margin-top: 4px;
-            opacity: 0;
-            transform: translateX(-4px);
+            font-size: .72rem; font-weight: 700; color: var(--verde);
+            text-transform: uppercase; letter-spacing: 1px;
+            opacity: 0; transform: translateX(-4px);
             transition: opacity .25s, transform .25s;
         }
-        .card:hover .card-link-hint { opacity: 1; transform: translateX(0); }
+        .card:hover .card-link-hint { opacity:1; transform:translateX(0); }
 
-        /* ─── ESTADO VAZIO ───────────────────────────────────────── */
-        .empty-state {
-            grid-column: 1 / -1;
-            text-align: center;
-            padding: 60px 20px;
-            color: var(--cinza-3);
+        /* ── TOAST ─────────────────────────────────────────────── */
+        #toast {
+            position: fixed; bottom: 80px; left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: var(--verde); color: white;
+            font-family: 'DM Sans', sans-serif;
+            font-size: .85rem; font-weight: 700;
+            padding: 10px 24px; border-radius: 999px;
+            box-shadow: 0 6px 24px rgba(0,150,57,.3);
+            opacity: 0; transition: opacity .4s, transform .4s;
+            pointer-events: none; z-index: 500;
         }
-        .empty-state p { font-size: 1.1rem; margin-top: 8px; }
+        #toast.show { opacity:1; transform: translateX(-50%) translateY(0); }
 
-        /* ─── FOOTER ─────────────────────────────────────────────── */
+        /* ── FOOTER ────────────────────────────────────────────── */
         footer {
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            background: rgba(255,255,255,.92);
-            backdrop-filter: blur(12px);
+            position: fixed; bottom:0; left:0; right:0;
+            background: rgba(255,255,255,.88);
+            backdrop-filter: blur(14px);
             border-top: 2px solid var(--cinza-2);
-            padding: 14px 24px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 16px;
+            padding: 12px 24px;
+            display: flex; justify-content: center; align-items: center; gap: 20px;
             z-index: 300;
         }
-
         .btn-pdf {
-            background: var(--preto);
-            color: var(--branco);
-            border: none;
-            padding: 11px 28px;
-            border-radius: 999px;
-            cursor: pointer;
+            background: var(--preto); color: var(--branco); border: none;
+            padding: 10px 26px; border-radius: 999px; cursor: pointer;
             font-family: 'DM Sans', sans-serif;
-            font-size: .85rem;
-            font-weight: 700;
-            letter-spacing: .5px;
+            font-size: .85rem; font-weight: 700; letter-spacing: .5px;
             transition: background var(--dur), transform .15s, box-shadow var(--dur);
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            display: flex; align-items: center; gap: 8px;
         }
         .btn-pdf:hover { background: var(--vermelho); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(200,16,46,.25); }
-        .btn-pdf:active { transform: translateY(0); }
-
-        .footer-info {
-            font-size: .75rem;
-            color: var(--cinza-3);
-            font-weight: 500;
-        }
+        .footer-info { font-size: .75rem; color: var(--cinza-3); font-weight: 500; }
         .footer-info strong { color: var(--txt-sec); }
 
-        /* ─── RESPONSIVE ─────────────────────────────────────────── */
+        /* ── RESPONSIVE ────────────────────────────────────────── */
         @media (max-width: 900px) {
-            header { grid-template-columns: 1fr auto; gap: 12px; padding: 0 16px; }
-            .header-brand { display: none; }
-            .logo-if { height: 48px; }
-            #clock { font-size: 1.6rem; }
-            .card.featured { flex-direction: column; max-height: none; grid-column: auto; }
-            .card.featured .img-box { width: 100%; height: 180px; }
-            #news-container { grid-template-columns: 1fr; }
+            header { grid-template-columns: 1fr auto; gap:12px; padding:0 16px; }
+            .header-brand { display:none; }
+            .logo-if { height:48px; }
+            #clock { font-size:1.6rem; }
+            .card.featured { flex-direction:column; max-height:none; grid-column:auto; }
+            .card.featured .img-box { width:100%; height:180px; }
+            #news-container { grid-template-columns:1fr; }
         }
-        @media (min-width: 1400px) {
-            #news-container { grid-template-columns: repeat(3, 1fr); }
-        }
+        @media (min-width:1400px) { #news-container { grid-template-columns: repeat(3,1fr); } }
     </style>
 </head>
 <body>
 
-<!-- HEADER -->
-<header>
-    <img id="logo-img"
-         src="https://github.com/yuriluna85/radar-ifbaiano/blob/main/marca-if-baiano-vertical.png?raw=true"
-         alt="Logo IF Baiano" class="logo-if"
-         onerror="this.style.display='none'">
+<canvas id="bg-canvas"></canvas>
 
+<header>
+    <img src="https://github.com/yuriluna85/radar-ifbaiano/blob/main/marca-if-baiano-vertical.png?raw=true"
+         alt="Logo IF Baiano" class="logo-if" onerror="this.style.display='none'">
     <div class="header-brand">
         <h1><span>DICOM</span>Radar de Notícias</h1>
     </div>
-
     <div class="header-clock">
         <div id="date-top">—</div>
         <div id="clock">00:00:00</div>
     </div>
 </header>
 
-<!-- BARRA DE PROGRESSO + CONSOLE -->
-<div class="top-bar"><div id="bar-fill"></div></div>
-<div id="status-console">Painel DICOM v48.0 — Iniciando…</div>
+<div class="top-bar"><div id="bar-fill" style="width:100%"></div></div>
+<div id="status-console">Painel DICOM v49.0 — Iniciando…</div>
 
-<!-- CONTEÚDO PRINCIPAL -->
 <div class="main-content">
-
     <div class="filters-wrap">
         <span class="filters-label">Filtrar</span>
         <div id="filters"></div>
     </div>
-
-    <!-- Skeleton enquanto carrega -->
     <div id="skeleton" class="skeleton-grid">
-        <div class="skeleton-card" style="background:#e8e8e8"></div>
-        <div class="skeleton-card" style="background:#efefef"></div>
-        <div class="skeleton-card" style="background:#e8e8e8"></div>
-        <div class="skeleton-card" style="background:#efefef"></div>
-        <div class="skeleton-card" style="background:#e8e8e8"></div>
-        <div class="skeleton-card" style="background:#efefef"></div>
+        <div class="skeleton-card"></div><div class="skeleton-card"></div>
+        <div class="skeleton-card"></div><div class="skeleton-card"></div>
+        <div class="skeleton-card"></div><div class="skeleton-card"></div>
     </div>
-
     <div id="news-container" style="display:none"></div>
 </div>
 
-<!-- FOOTER -->
+<div id="toast"></div>
+
 <footer>
     <button class="btn-pdf" onclick="gerarRelatorioPDF()">
         📄 Exportar PDF — <span id="pdf-context">Geral</span>
     </button>
-    <span class="footer-info">Atualiza a cada <strong>2 min</strong></span>
+    <span class="footer-info">Busca a cada <strong>1h</strong> · Verifica a cada <strong>5min</strong></span>
 </footer>
-
 
 <script>
 /* ════════════════════════════════════════════════════════════
-   CONFIGURAÇÃO
+   CONFIG
 ════════════════════════════════════════════════════════════ */
 const CONFIG = {
-    LOGO_URL:        "https://github.com/yuriluna85/radar-ifbaiano/blob/main/marca-if-baiano-vertical.png?raw=true",
-    REFRESH_SECONDS: 120,
-    POSTS_PER_UNIT:  5,
-    CACHE_KEY:       "radar_ifbaiano_cache",
-    CACHE_TTL_MS:    90_000, // 90s
+    LOGO_URL:          "https://github.com/yuriluna85/radar-ifbaiano/blob/main/marca-if-baiano-vertical.png?raw=true",
+    FETCH_INTERVAL_MS: 60 * 60 * 1000,  // 1h — busca nos servidores
+    CHECK_INTERVAL_MS:  5 * 60 * 1000,  // 5min — re-renderiza se cache mudou
+    POSTS_PER_UNIT:    5,
+    CACHE_KEY:         "radar_ifbaiano_v2",
+    CACHE_TTL_MS:      55 * 60 * 1000,  // 55min
 };
 
 const UNIDADES = [
-    { id: "Reitoria",    url: "https://www.ifbaiano.edu.br/portal/wp-json/wp/v2/posts/" },
-    { id: "Alagoinhas",  url: "https://www.ifbaiano.edu.br/unidades/alagoinhas/wp-json/wp/v2/posts/" },
-    { id: "Lapa",        url: "https://www.ifbaiano.edu.br/unidades/lapa/wp-json/wp/v2/posts/" },
-    { id: "Catu",        url: "https://www.ifbaiano.edu.br/unidades/catu/wp-json/wp/v2/posts/" },
-    { id: "Mangabeira",  url: "https://www.ifbaiano.edu.br/unidades/gmb/wp-json/wp/v2/posts/" },
-    { id: "Guanambi",    url: "https://www.ifbaiano.edu.br/unidades/guanambi/wp-json/wp/v2/posts/" },
-    { id: "Itaberaba",   url: "https://www.ifbaiano.edu.br/unidades/itaberaba/wp-json/wp/v2/posts/" },
-    { id: "Itapetinga",  url: "https://www.ifbaiano.edu.br/unidades/itapetinga/wp-json/wp/v2/posts/" },
-    { id: "Santa Inês",  url: "https://www.ifbaiano.edu.br/unidades/santaines/wp-json/wp/v2/posts/" },
-    { id: "Bonfim",      url: "https://www.ifbaiano.edu.br/unidades/bonfim/wp-json/wp/v2/posts/" },
-    { id: "Serrinha",    url: "https://www.ifbaiano.edu.br/unidades/serrinha/wp-json/wp/v2/posts/" },
-    { id: "Teixeira",    url: "https://www.ifbaiano.edu.br/unidades/teixeira/wp-json/wp/v2/posts/" },
-    { id: "Uruçuca",     url: "https://www.ifbaiano.edu.br/unidades/urucuca/wp-json/wp/v2/posts/" },
-    { id: "Valença",     url: "https://www.ifbaiano.edu.br/unidades/valenca/wp-json/wp/v2/posts/" },
-    { id: "Xique-Xique", url: "https://www.ifbaiano.edu.br/unidades/xique-xique/wp-json/wp/v2/posts/" },
+    { id:"Reitoria",    url:"https://www.ifbaiano.edu.br/portal/wp-json/wp/v2/posts/" },
+    { id:"Alagoinhas",  url:"https://www.ifbaiano.edu.br/unidades/alagoinhas/wp-json/wp/v2/posts/" },
+    { id:"Lapa",        url:"https://www.ifbaiano.edu.br/unidades/lapa/wp-json/wp/v2/posts/" },
+    { id:"Catu",        url:"https://www.ifbaiano.edu.br/unidades/catu/wp-json/wp/v2/posts/" },
+    { id:"Mangabeira",  url:"https://www.ifbaiano.edu.br/unidades/gmb/wp-json/wp/v2/posts/" },
+    { id:"Guanambi",    url:"https://www.ifbaiano.edu.br/unidades/guanambi/wp-json/wp/v2/posts/" },
+    { id:"Itaberaba",   url:"https://www.ifbaiano.edu.br/unidades/itaberaba/wp-json/wp/v2/posts/" },
+    { id:"Itapetinga",  url:"https://www.ifbaiano.edu.br/unidades/itapetinga/wp-json/wp/v2/posts/" },
+    { id:"Santa Inês",  url:"https://www.ifbaiano.edu.br/unidades/santaines/wp-json/wp/v2/posts/" },
+    { id:"Bonfim",      url:"https://www.ifbaiano.edu.br/unidades/bonfim/wp-json/wp/v2/posts/" },
+    { id:"Serrinha",    url:"https://www.ifbaiano.edu.br/unidades/serrinha/wp-json/wp/v2/posts/" },
+    { id:"Teixeira",    url:"https://www.ifbaiano.edu.br/unidades/teixeira/wp-json/wp/v2/posts/" },
+    { id:"Uruçuca",     url:"https://www.ifbaiano.edu.br/unidades/urucuca/wp-json/wp/v2/posts/" },
+    { id:"Valença",     url:"https://www.ifbaiano.edu.br/unidades/valenca/wp-json/wp/v2/posts/" },
+    { id:"Xique-Xique", url:"https://www.ifbaiano.edu.br/unidades/xique-xique/wp-json/wp/v2/posts/" },
 ];
 
 /* ════════════════════════════════════════════════════════════
@@ -523,21 +413,73 @@ const UNIDADES = [
 ════════════════════════════════════════════════════════════ */
 let dataStore     = [];
 let currentFilter = "Todos";
-let timerCount    = CONFIG.REFRESH_SECONDS;
-let timerInterval = null;
+let fetchCountdown = CONFIG.FETCH_INTERVAL_MS / 1000;
+let barTimer      = null;
 
 /* ════════════════════════════════════════════════════════════
-   ELEMENTOS DOM
+   DOM
 ════════════════════════════════════════════════════════════ */
-const $ = id => document.getElementById(id);
-const elClock    = $("clock");
-const elDate     = $("date-top");
-const elConsole  = $("status-console");
-const elBarFill  = $("bar-fill");
-const elFilters  = $("filters");
-const elNews     = $("news-container");
-const elSkeleton = $("skeleton");
-const elPdfCtx   = $("pdf-context");
+const $         = id => document.getElementById(id);
+const elClock   = $("clock"),  elDate   = $("date-top");
+const elConsole = $("status-console"), elBarFill = $("bar-fill");
+const elFilters = $("filters"), elNews  = $("news-container");
+const elSkeleton= $("skeleton"), elPdfCtx= $("pdf-context");
+const elToast   = $("toast");
+
+/* ════════════════════════════════════════════════════════════
+   ANTI-BURN-IN: bolhas de gradiente em movimento lento
+════════════════════════════════════════════════════════════ */
+(function initBg() {
+    const canvas = $("bg-canvas");
+    const ctx    = canvas.getContext("2d");
+
+    // Paleta: tons de verde muito suave
+    const PALETA = [
+        [0,  150, 57,  .04],
+        [0,  100, 40,  .03],
+        [180,220,180,  .05],
+        [240,245,240,  .06],
+        [220,240,220,  .05],
+        [0,  180, 70,  .03],
+        [200,230,200,  .04],
+    ];
+
+    let blobs = PALETA.map(([r,g,b,a]) => ({
+        x:  Math.random() * window.innerWidth,
+        y:  Math.random() * window.innerHeight,
+        r:  260 + Math.random() * 280,
+        vx: (Math.random() - .5) * .22,
+        vy: (Math.random() - .5) * .22,
+        cr:r, cg:g, cb:b, ca:a,
+    }));
+
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    resize();
+    window.addEventListener("resize", resize);
+
+    function frame() {
+        const W = canvas.width, H = canvas.height;
+        ctx.fillStyle = "#eef0ee";
+        ctx.fillRect(0, 0, W, H);
+
+        blobs.forEach(b => {
+            const g = ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,b.r);
+            g.addColorStop(0, `rgba(${b.cr},${b.cg},${b.cb},${b.ca})`);
+            g.addColorStop(1, `rgba(${b.cr},${b.cg},${b.cb},0)`);
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
+            ctx.fillStyle = g;
+            ctx.fill();
+            b.x += b.vx; b.y += b.vy;
+            if (b.x < -b.r) b.x = W+b.r;
+            if (b.x > W+b.r) b.x = -b.r;
+            if (b.y < -b.r) b.y = H+b.r;
+            if (b.y > H+b.r) b.y = -b.r;
+        });
+        requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+})();
 
 /* ════════════════════════════════════════════════════════════
    RELÓGIO
@@ -545,169 +487,177 @@ const elPdfCtx   = $("pdf-context");
 function updateClock() {
     const now = new Date();
     elClock.textContent = now.toLocaleTimeString("pt-BR");
-    elDate.textContent  = now.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+    elDate.textContent  = now.toLocaleDateString("pt-BR",{day:"2-digit",month:"long",year:"numeric"});
 }
-setInterval(updateClock, 1000);
-updateClock();
+setInterval(updateClock, 1000); updateClock();
+
+/* ════════════════════════════════════════════════════════════
+   BARRA DE PROGRESSO (contagem até próximo fetch 1h)
+════════════════════════════════════════════════════════════ */
+function startProgressBar() {
+    fetchCountdown = CONFIG.FETCH_INTERVAL_MS / 1000;
+    clearInterval(barTimer);
+    barTimer = setInterval(() => {
+        fetchCountdown--;
+        elBarFill.style.width = (fetchCountdown / (CONFIG.FETCH_INTERVAL_MS/1000) * 100) + "%";
+        if (fetchCountdown <= 0) { clearInterval(barTimer); giroCompleto(); }
+    }, 1000);
+}
+
+/* ════════════════════════════════════════════════════════════
+   TOAST
+════════════════════════════════════════════════════════════ */
+function showToast(msg) {
+    elToast.textContent = msg;
+    elToast.classList.add("show");
+    setTimeout(() => elToast.classList.remove("show"), 5000);
+}
 
 /* ════════════════════════════════════════════════════════════
    FILTROS
 ════════════════════════════════════════════════════════════ */
 function buildFilters() {
-    const makeBtn = (label, isActive = false) => {
-        const btn = document.createElement("button");
-        btn.className = "btn-filter" + (isActive ? " active" : "");
-        btn.textContent = label;
-        btn.onclick = () => applyFilter(label, btn);
-        return btn;
+    const make = (label, active=false) => {
+        const b = document.createElement("button");
+        b.className = "btn-filter" + (active?" active":"");
+        b.textContent = label;
+        b.onclick = () => applyFilter(label, b);
+        return b;
     };
-    elFilters.appendChild(makeBtn("Todos", true));
-    UNIDADES.forEach(u => elFilters.appendChild(makeBtn(u.id)));
+    elFilters.appendChild(make("Todos", true));
+    UNIDADES.forEach(u => elFilters.appendChild(make(u.id)));
 }
-
 function applyFilter(id, btn) {
     currentFilter = id;
     document.querySelectorAll(".btn-filter").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
-    elPdfCtx.textContent = id === "Todos" ? "Geral" : id;
+    elPdfCtx.textContent = id==="Todos" ? "Geral" : id;
     render(dataStore);
 }
 
 /* ════════════════════════════════════════════════════════════
-   CACHE SESSIONALSTORAGE
+   CACHE (sessionStorage)
 ════════════════════════════════════════════════════════════ */
 function saveCache(data) {
-    try {
-        sessionStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
-    } catch (_) { /* silencioso se cheio */ }
+    try { sessionStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify({ts:Date.now(), data})); } catch(_) {}
 }
-
 function loadCache() {
     try {
         const raw = sessionStorage.getItem(CONFIG.CACHE_KEY);
         if (!raw) return null;
-        const { ts, data } = JSON.parse(raw);
-        if (Date.now() - ts < CONFIG.CACHE_TTL_MS) return data;
-    } catch (_) { /* corrompido */ }
+        const {ts, data} = JSON.parse(raw);
+        if (Date.now()-ts < CONFIG.CACHE_TTL_MS) return data;
+    } catch(_) {}
     return null;
 }
 
 /* ════════════════════════════════════════════════════════════
    PARSER DE POST
 ════════════════════════════════════════════════════════════ */
-const HTML_ENTITIES = { "&#8211;": "–", "&#8220;": "\u201C", "&#8221;": "\u201D", "&nbsp;": " ", "&amp;": "&" };
-const decodeTitle = t => t.replace(/&#\d+;|&\w+;/g, m => HTML_ENTITIES[m] ?? m);
+const ENTITIES = {"&#8211;":"–","&#8220;":"\u201C","&#8221;":"\u201D","&nbsp;":" ","&amp;":"&"};
+const decodeTitle = t => t.replace(/&#\d+;|&\w+;/g, m => ENTITIES[m] ?? m);
 
 function parsePost(post, campusId) {
-    let img      = CONFIG.LOGO_URL;
-    let imgStatus = "fallback";
-
+    let img = CONFIG.LOGO_URL, imgStatus = "fallback";
     if (post._embedded?.["wp:featuredmedia"]?.[0]?.source_url) {
-        img       = post._embedded["wp:featuredmedia"][0].source_url;
-        imgStatus = "featured";
+        img = post._embedded["wp:featuredmedia"][0].source_url; imgStatus = "featured";
     } else {
         const m = post.content?.rendered?.match(/src="([^"]+)"/);
         if (m) { img = m[1]; imgStatus = "inline"; }
     }
-
-    return {
-        title:     decodeTitle(post.title.rendered),
-        link:      post.link,
-        date:      new Date(post.date),
-        campus:    campusId,
-        img,
-        imgStatus,
-        isFallback: imgStatus === "fallback",
-    };
+    return { title:decodeTitle(post.title.rendered), link:post.link,
+             date:new Date(post.date), campus:campusId,
+             img, imgStatus, isFallback: imgStatus==="fallback" };
 }
 
 /* ════════════════════════════════════════════════════════════
-   FETCH (PARALELO)
+   FETCH PARALELO (busca em todas as unidades ao mesmo tempo)
 ════════════════════════════════════════════════════════════ */
-async function fetchUnit(unidade) {
-    const url = `${unidade.url}?per_page=${CONFIG.POSTS_PER_UNIT}&_embed&_t=${Date.now()}`;
+async function fetchUnit(u) {
     try {
-        const res  = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const res = await fetch(`${u.url}?per_page=${CONFIG.POSTS_PER_UNIT}&_embed&_t=${Date.now()}`);
+        if (!res.ok) throw new Error();
         const posts = await res.json();
-        return Array.isArray(posts) ? posts.map(p => parsePost(p, unidade.id)) : [];
-    } catch (_) {
-        // em caso de falha, preserva dados antigos dessa unidade
-        return dataStore.filter(n => n.campus === unidade.id);
+        return Array.isArray(posts) ? posts.map(p => parsePost(p, u.id)) : [];
+    } catch(_) {
+        return dataStore.filter(n => n.campus === u.id); // fallback para dados anteriores
     }
 }
 
 async function giroCompleto() {
-    elConsole.textContent = "Sincronizando todas as unidades em paralelo…";
+    elConsole.textContent = "Buscando notícias em todas as unidades (paralelo)…";
+    const prevLinks = new Set(dataStore.map(n => n.link));
 
-    // Carregamento PARALELO — muito mais rápido que o loop sequencial
     const results = await Promise.allSettled(UNIDADES.map(fetchUnit));
-    const batch   = results.flatMap(r => r.status === "fulfilled" ? r.value : []);
+    const batch   = results.flatMap(r => r.status==="fulfilled" ? r.value : []);
 
     if (batch.length) {
+        const novas = batch.filter(n => !prevLinks.has(n.link)).length;
         dataStore = batch;
         saveCache(batch);
+        if (novas > 0 && prevLinks.size > 0)
+            showToast(`✓ ${novas} nova${novas>1?"s":""} notícia${novas>1?"s":""} encontrada${novas>1?"s":""}`);
     }
 
     render(dataStore);
     hideSkeleton();
-    elConsole.textContent = `Online ● Última sincronização: ${new Date().toLocaleTimeString("pt-BR")} · ${dataStore.length} notícias carregadas`;
+    const agora = new Date().toLocaleTimeString("pt-BR");
+    const prox  = new Date(Date.now()+CONFIG.FETCH_INTERVAL_MS).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+    elConsole.textContent = `Online ● Sincronizado às ${agora} · ${dataStore.length} notícias · Próxima busca: ${prox}`;
+    startProgressBar();
 }
 
 /* ════════════════════════════════════════════════════════════
-   TIMER DE AUTO-REFRESH
+   CHECK PERIÓDICO A CADA 5MIN
+   Re-renderiza se os dados em cache mudaram (ex: outra aba
+   ou outro cliente já buscou antes).
 ════════════════════════════════════════════════════════════ */
-function startTimer() {
-    clearInterval(timerInterval);
-    timerCount = CONFIG.REFRESH_SECONDS;
-    timerInterval = setInterval(() => {
-        timerCount--;
-        elBarFill.style.width = (timerCount / CONFIG.REFRESH_SECONDS * 100) + "%";
-        if (timerCount <= 0) {
-            timerCount = CONFIG.REFRESH_SECONDS;
-            giroCompleto();
-        }
-    }, 1000);
-}
+setInterval(() => {
+    const cached = loadCache();
+    if (!cached) return;
+    const rehy = cached.map(n => ({...n, date:new Date(n.date)}));
+    if (rehy[0]?.link !== dataStore[0]?.link) {
+        dataStore = rehy;
+        render(dataStore);
+        elConsole.textContent = `Exibição atualizada às ${new Date().toLocaleTimeString("pt-BR")}`;
+    }
+}, CONFIG.CHECK_INTERVAL_MS);
 
 /* ════════════════════════════════════════════════════════════
    RENDER
 ════════════════════════════════════════════════════════════ */
+const KB = ["kb-0","kb-1","kb-2","kb-3"];
+
 function buildDisplayList(list) {
     if (currentFilter === "Todos") {
-        const latestMap = new Map();
-        list.forEach(item => {
-            const prev = latestMap.get(item.campus);
-            if (!prev || item.date > prev.date) latestMap.set(item.campus, item);
-        });
-        const arr = Array.from(latestMap.values()).sort((a, b) => b.date - a.date);
-        const rIdx = arr.findIndex(n => n.campus === "Reitoria");
-        if (rIdx > 0) arr.unshift(arr.splice(rIdx, 1)[0]);
+        const map = new Map();
+        list.forEach(n => { if (!map.has(n.campus)||n.date>map.get(n.campus).date) map.set(n.campus,n); });
+        const arr = Array.from(map.values()).sort((a,b)=>b.date-a.date);
+        const ri = arr.findIndex(n=>n.campus==="Reitoria");
+        if (ri>0) arr.unshift(arr.splice(ri,1)[0]);
         return arr;
     }
-    return list.filter(n => n.campus === currentFilter).sort((a, b) => b.date - a.date).slice(0, 8);
+    return list.filter(n=>n.campus===currentFilter).sort((a,b)=>b.date-a.date).slice(0,8);
 }
 
-function formatDate(d) {
-    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
-        + " · "
-        + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+function fmtDate(d) {
+    return d.toLocaleDateString("pt-BR",{day:"2-digit",month:"short",year:"numeric"})
+         + " · "
+         + d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
 }
 
-function cardHTML(n, index) {
-    const featured = index === 0 ? " featured" : "";
+function cardHTML(n, i) {
+    const featured = i===0 ? " featured" : "";
+    const kb       = n.isFallback ? "" : " "+KB[i%4];
     return `
     <a href="${n.link}" target="_blank" rel="noopener" class="card${featured}">
         <div class="img-box">
-            <div class="img-src${n.isFallback ? " fallback" : ""}"
-                 style="background-image:url('${n.img}')"
-                 loading="lazy"></div>
+            <div class="img-src${n.isFallback?" fallback":""}${kb}"
+                 style="background-image:url('${n.img}')"></div>
             <div class="badge">${n.campus}</div>
         </div>
         <div class="info">
-            <div class="card-meta">
-                <time>${formatDate(n.date)}</time>
-            </div>
+            <div class="card-meta"><time>${fmtDate(n.date)}</time></div>
             <h2 class="title">${n.title}</h2>
             <div class="card-link-hint">↗ Ler notícia</div>
         </div>
@@ -716,11 +666,9 @@ function cardHTML(n, index) {
 
 function render(list) {
     const display = buildDisplayList(list);
-    if (!display.length) {
-        elNews.innerHTML = `<div class="empty-state"><p>Nenhuma notícia encontrada para <strong>${currentFilter}</strong>.</p></div>`;
-    } else {
-        elNews.innerHTML = display.map(cardHTML).join("");
-    }
+    elNews.innerHTML = display.length
+        ? display.map(cardHTML).join("")
+        : `<div style="grid-column:1/-1;text-align:center;padding:60px;color:#aaa"><p>Nenhuma notícia para <strong>${currentFilter}</strong></p></div>`;
     elNews.style.display = "grid";
 }
 
@@ -732,74 +680,48 @@ function hideSkeleton() {
    PDF
 ════════════════════════════════════════════════════════════ */
 function getBase64FromUrl(url) {
-    return new Promise((res, rej) => {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
+    return new Promise((res,rej) => {
+        const img = new Image(); img.crossOrigin = "anonymous";
         img.onload = () => {
             const c = document.createElement("canvas");
-            c.width = img.width; c.height = img.height;
-            c.getContext("2d").drawImage(img, 0, 0);
+            c.width=img.width; c.height=img.height;
+            c.getContext("2d").drawImage(img,0,0);
             res(c.toDataURL("image/png"));
         };
-        img.onerror = rej;
-        img.src = url;
+        img.onerror = rej; img.src = url;
     });
 }
 
 async function gerarRelatorioPDF() {
-    if (!window.jspdf?.jsPDF) { alert("Biblioteca PDF ainda carregando, tente novamente."); return; }
-    if (!dataStore.length)    { alert("Aguarde a sincronização inicial."); return; }
-
-    elConsole.textContent = "Gerando relatório institucional…";
-
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF("p", "mm", "a4");
-    const now  = new Date();
-    const label = currentFilter === "Todos" ? "Geral" : currentFilter;
-
-    const reportData = (currentFilter === "Todos")
-        ? [...dataStore].sort((a, b) => b.date - a.date)
-        : dataStore.filter(n => n.campus === currentFilter).sort((a, b) => b.date - a.date);
-
-    // Logo
-    try {
-        const logo = await getBase64FromUrl(CONFIG.LOGO_URL);
-        doc.addImage(logo, "PNG", 10, 8, 28, 38);
-    } catch (_) {}
-
-    // Cabeçalho
-    doc.setFont("helvetica", "bold"); doc.setFontSize(15);
-    doc.text(`Relatório de Monitoramento — ${label}`, 44, 22);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-    doc.setTextColor(80);
-    doc.text(`DICOM · Gerado em ${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR")}`, 44, 30);
-    doc.setTextColor(0);
-    doc.setDrawColor(0, 150, 57);
-    doc.setLineWidth(.6);
-    doc.line(10, 52, 200, 52);
-
-    // Tabela
-    const rows = reportData.map(n => [
-        n.date.toLocaleDateString("pt-BR") + "\n" + n.date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-        n.campus,
-        n.title + "\n\n" + n.link,
-        n.imgStatus,
-    ]);
-
+    if (!window.jspdf?.jsPDF) { alert("Biblioteca PDF carregando…"); return; }
+    if (!dataStore.length)    { alert("Aguarde a sincronização."); return; }
+    elConsole.textContent = "Gerando relatório…";
+    const {jsPDF} = window.jspdf;
+    const doc = new jsPDF("p","mm","a4");
+    const now = new Date();
+    const label = currentFilter==="Todos" ? "Geral" : currentFilter;
+    const rows = (currentFilter==="Todos" ? [...dataStore] : dataStore.filter(n=>n.campus===currentFilter))
+        .sort((a,b)=>b.date-a.date)
+        .map(n=>[
+            n.date.toLocaleDateString("pt-BR")+"\n"+n.date.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}),
+            n.campus, n.title+"\n\n"+n.link, n.imgStatus
+        ]);
+    try { doc.addImage(await getBase64FromUrl(CONFIG.LOGO_URL),"PNG",10,8,28,38); } catch(_) {}
+    doc.setFont("helvetica","bold"); doc.setFontSize(15);
+    doc.text(`Relatório de Monitoramento — ${label}`,44,22);
+    doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(80);
+    doc.text(`DICOM · ${now.toLocaleDateString("pt-BR")} às ${now.toLocaleTimeString("pt-BR")}`,44,30);
+    doc.setTextColor(0); doc.setDrawColor(0,150,57); doc.setLineWidth(.6); doc.line(10,52,200,52);
     doc.autoTable({
-        startY: 58,
-        head:   [["Data/Hora", "Campus", "Título e URL", "Imagem"]],
-        body:   rows,
-        headStyles:   { fillColor: [0, 150, 57], fontSize: 8 },
-        bodyStyles:   { fontSize: 7.5, cellPadding: 3 },
-        columnStyles: { 0: { cellWidth: 24 }, 1: { cellWidth: 26 }, 2: { cellWidth: 110 }, 3: { cellWidth: 26 } },
-        alternateRowStyles: { fillColor: [245, 255, 248] },
-        margin: { left: 10, right: 10 },
+        startY:58, head:[["Data/Hora","Campus","Título e URL","Imagem"]], body:rows,
+        headStyles:{fillColor:[0,150,57],fontSize:8},
+        bodyStyles:{fontSize:7.5,cellPadding:3},
+        columnStyles:{0:{cellWidth:24},1:{cellWidth:26},2:{cellWidth:110},3:{cellWidth:26}},
+        alternateRowStyles:{fillColor:[245,255,248]},
+        margin:{left:10,right:10},
     });
-
-    const filename = `Relatorio_Radar_${label.replace(/\s/g, "_")}_${now.toLocaleDateString("pt-BR").replace(/\//g, "-")}.pdf`;
-    doc.save(filename);
-    elConsole.textContent = `✓ Relatório "${filename}" gerado com sucesso.`;
+    doc.save(`Relatorio_${label.replace(/\s/g,"_")}_${now.toLocaleDateString("pt-BR").replace(/\//g,"-")}.pdf`);
+    elConsole.textContent = "✓ Relatório gerado com sucesso.";
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -807,18 +729,14 @@ async function gerarRelatorioPDF() {
 ════════════════════════════════════════════════════════════ */
 function init() {
     buildFilters();
-
-    // Tenta carregar cache imediatamente para resposta instantânea
     const cached = loadCache();
     if (cached?.length) {
-        dataStore = cached.map(n => ({ ...n, date: new Date(n.date) })); // rehydrate dates
+        dataStore = cached.map(n => ({...n, date:new Date(n.date)}));
         render(dataStore);
         hideSkeleton();
-        elConsole.textContent = "Cache restaurado. Sincronizando com servidores…";
+        elConsole.textContent = "Cache restaurado. Sincronizando em segundo plano…";
     }
-
     giroCompleto();
-    startTimer();
 }
 
 init();
